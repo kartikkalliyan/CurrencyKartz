@@ -21,6 +21,7 @@ import os
 import json
 import smtplib
 from email.mime.text import MIMEText
+from fpdf import FPDF
 import plotly.graph_objects as go
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
@@ -183,6 +184,57 @@ def get_consensus(df):
 def run_track_record(signal_df, risk_kwargs):
     results = backtest(signal_df, starting_cash=1000.0, fee_rate=0.001, **risk_kwargs)
     return results
+
+
+def generate_pdf_report(asset_label, symbol, strategy_choice, risk_choice, slippage_choice,
+                        recommendation, reason, latest, track_results, window_label):
+    """
+    Builds a one-page PDF summary of the current recommendation and its
+    backtest track record -- useful as a personal record of what the
+    tool said and why, at a point in time.
+    """
+    pdf = FPDF()
+    pdf.add_page()
+
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "Trading Advisor Report", ln=1)
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=1)
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, f"Asset: {asset_label} ({symbol})", ln=1)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, f"Strategy: {strategy_choice}", ln=1)
+    pdf.cell(0, 6, f"Risk style: {risk_choice}", ln=1)
+    pdf.cell(0, 6, f"Slippage assumption: {slippage_choice}", ln=1)
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, f"Recommendation: {recommendation}", ln=1)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.multi_cell(0, 6, reason)
+    pdf.ln(2)
+    pdf.cell(0, 6, f"Price: ${latest['close']:.2f}   MA20: ${latest['MA_20']:.2f}   "
+                   f"MA50: ${latest['MA_50']:.2f}", ln=1)
+    pdf.cell(0, 6, f"Regime: {latest['regime']}   RSI: {latest['RSI']:.1f}", ln=1)
+    pdf.cell(0, 6, f"As of candle: {latest['timestamp'].date()}", ln=1)
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, f"Track record ({window_label})", ln=1)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, f"Strategy return: {track_results['strategy_return_pct']:.2f}%", ln=1)
+    pdf.cell(0, 6, f"Buy & hold return: {track_results['buy_hold_return_pct']:.2f}%", ln=1)
+    pdf.cell(0, 6, f"Number of trades: {track_results['num_trades']}", ln=1)
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.multi_cell(0, 5, "This is a decision-support tool, not financial advice. Past "
+                        "performance does not guarantee future results.")
+
+    return bytes(pdf.output())
 
 
 JOURNAL_FILE = "trade_journal.csv"
@@ -722,11 +774,36 @@ else:
     st.warning("This combo underperformed buy-and-hold over this period. "
                "Try a different strategy/risk combo above to compare.")
 
+trade_log_df = pd.DataFrame(track_results["trade_log"])
+if len(trade_log_df) > 0:
+    st.download_button(
+        "Download full trade log (CSV)",
+        data=trade_log_df.to_csv(index=False),
+        file_name=f"{symbol}_{strategy_choice.replace(' ', '_')}_trade_log.csv",
+        mime="text/csv"
+    )
+
+pdf_bytes = generate_pdf_report(asset_label, symbol, strategy_choice, risk_choice,
+                                slippage_choice, recommendation, reason, latest,
+                                track_results, window_label)
+st.download_button(
+    "Download summary report (PDF)",
+    data=pdf_bytes,
+    file_name=f"{symbol}_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+    mime="application/pdf"
+)
+
 st.markdown("### Recent signal history")
 st.caption(f"The actual BUY/SELL signals **{strategy_choice}** generated for this asset recently.")
 history = get_signal_history(signal_df, n=10)
 if len(history) > 0:
     st.dataframe(history, use_container_width=True, hide_index=True)
+    st.download_button(
+        "Download signal history (CSV)",
+        data=history.to_csv(index=False),
+        file_name=f"{symbol}_{strategy_choice.replace(' ', '_')}_signals.csv",
+        mime="text/csv"
+    )
 else:
     st.write("No BUY/SELL signals in the recent history window.")
 
@@ -752,6 +829,12 @@ asset_journal = journal[journal["Asset"] == asset_label] if len(journal) > 0 els
 if len(asset_journal) > 0:
     st.dataframe(asset_journal.sort_values("Date", ascending=False),
                  use_container_width=True, hide_index=True)
+    st.download_button(
+        "Download journal (CSV)",
+        data=asset_journal.to_csv(index=False),
+        file_name=f"{symbol}_journal.csv",
+        mime="text/csv"
+    )
 else:
     st.write("No journal entries for this asset yet.")
 
