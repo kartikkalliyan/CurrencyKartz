@@ -1,8 +1,6 @@
 """
 Central configuration: asset list, strategy registry, and all the
-selectable options used throughout the app. Keeping these in one
-place means adding a new strategy or option only requires editing
-here, not hunting through the UI code.
+selectable options used throughout the app.
 """
 
 from strategy_v4_filtered_ma import generate_signals as ma_crossover_signals
@@ -12,6 +10,8 @@ from strategy_bollinger import generate_signals as bollinger_signals
 from strategy_macd import generate_signals as macd_signals
 from strategy_breakout import generate_signals as breakout_signals
 from strategy_buyhold import generate_signals as buyhold_signals
+from strategy_ensemble import generate_signals as ensemble_signals
+from indian_stocks import INDIAN_STOCK_OPTIONS
 
 ASSET_OPTIONS = {
     "Bitcoin (BTC)": "BTCUSDT",
@@ -19,6 +19,13 @@ ASSET_OPTIONS = {
     "Solana (SOL)": "SOLUSDT",
     "Binance Coin (BNB)": "BNBUSDT",
     "PAX Gold (PAXG)": "PAXGUSDT",
+}
+
+# Kept separate from ASSET_OPTIONS since these use a different data
+# source (Yahoo Finance, not Binance) -- see indian_stocks.py
+ASSET_CLASS_OPTIONS = {
+    "Crypto (Binance)": "crypto",
+    "Indian Stocks (NSE)": "stocks",
 }
 
 STRATEGY_FUNCS = {
@@ -29,6 +36,7 @@ STRATEGY_FUNCS = {
     "MACD Crossover": macd_signals,
     "Volume-Confirmed Breakout": breakout_signals,
     "Buy & Hold (baseline)": buyhold_signals,
+    "Ensemble Voting (3-of-6 agreement)": ensemble_signals,
 }
 
 RISK_STYLES = {
