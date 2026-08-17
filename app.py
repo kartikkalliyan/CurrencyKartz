@@ -1,9 +1,9 @@
 """
-LIVE TRADING ADVISOR - Streamlit UI (modularized)
+LIVE TRADING ADVISOR - Streamlit UI (modularized, dual asset class)
 
-All the actual logic lives in config.py, data_fetching.py, core_logic.py,
-journal.py, reports.py, display_helpers.py, and indian_stocks.py. This
-file is just the UI flow.
+All actual logic lives in config.py, data_fetching.py, core_logic.py,
+journal.py, reports.py, display_helpers.py, and indian_stocks.py.
+This file is just the UI flow.
 
 Run with:
     pip install streamlit streamlit-autorefresh plotly fpdf2 yfinance
@@ -22,7 +22,7 @@ from data_fetching import fetch_data, find_data_for_trade_target
 from core_logic import (
     prep_data, reason_for_signal, get_recommendation, run_track_record,
     get_signal_history, get_consensus, get_all_recommendations,
-    run_portfolio_backtest, run_optimizer
+    get_all_stock_recommendations, run_portfolio_backtest, run_optimizer
 )
 from journal import load_journal, add_journal_entry
 from reports import generate_pdf_report
@@ -31,9 +31,13 @@ from display_helpers import make_candlestick_chart, badge
 st.set_page_config(page_title="Live Trading Advisor", layout="wide")
 
 
-# ---------------------------------------------------------------------
-# HEADER
-# ---------------------------------------------------------------------
+def resolve_custom_stock_symbol(user_input):
+    """NSE tickers need a .NS suffix -- add it if the user left it off."""
+    symbol = user_input.strip().upper().replace(" ", "")
+    if not symbol.endswith(".NS"):
+        symbol = symbol + ".NS"
+    return symbol
+
 
 st.title("Live Trading Advisor")
 st.caption("Decision-support only. This tool never places trades -- you decide.")
@@ -51,13 +55,15 @@ with st.expander("What this strategy is actually good at (read before trusting i
     - **Known limitation:** on more volatile assets (SOL, BNB), the 10%
       trailing stop tends to get triggered by normal volatility, exiting
       trades too early.
-    - You now have 8 strategies, 3 risk styles, position sizing, slippage
-      modeling, and now Indian stocks (via Yahoo Finance) alongside crypto
-      (via Binance) -- use the Track Record section below to compare combos
-      honestly before trusting any recommendation.
+    - **Important:** all of the above was validated on CRYPTO only. Indian
+      stock behavior is different (different volatility, trading hours,
+      circuit limits) -- treat stock recommendations as unvalidated until
+      tested with the same rigor. See README.
 
-    See the README for the full research findings, including a
-    documented overfitting discovery.
+    You now have 8 strategies, 3 risk styles, position sizing, slippage
+    modeling, and two asset classes (crypto via Binance, Indian stocks via
+    Yahoo Finance) -- use the Track Record section to compare combos
+    honestly before trusting any recommendation.
     """)
 
 refresh_minutes = st.sidebar.selectbox("Auto-refresh every:", [5, 15, 30, 60], index=1)
@@ -67,14 +73,17 @@ st.caption(f"Last checked: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
            f"(auto-refreshing every {refresh_minutes} min)")
 
 
-# ---------------------------------------------------------------------
-# MULTI-ASSET OVERVIEW (crypto only for now)
-# ---------------------------------------------------------------------
-
-st.markdown("### All assets at a glance (crypto)")
+st.markdown("### All assets at a glance")
+overview_class_label = st.radio("Asset class:", list(ASSET_CLASS_OPTIONS.keys()),
+                                horizontal=True, key="overview_class")
+overview_class = ASSET_CLASS_OPTIONS[overview_class_label]
 st.caption("Uses the default combo (MA Crossover + Trailing stop). Customize per asset below.")
+
 with st.spinner("Checking all assets..."):
-    overview_df = get_all_recommendations()
+    if overview_class == "crypto":
+        overview_df = get_all_recommendations()
+    else:
+        overview_df = get_all_stock_recommendations()
 
 
 def highlight_recommendation(val):
@@ -93,43 +102,46 @@ st.dataframe(
 )
 
 
-# ---------------------------------------------------------------------
-# PORTFOLIO BACKTEST (crypto only for now)
-# ---------------------------------------------------------------------
-
 st.markdown("---")
-st.markdown("### Portfolio backtest (crypto)")
+st.markdown("### Portfolio backtest")
 st.caption("Split capital across multiple assets at once, using one shared strategy/risk "
            "combo, and see the combined result.")
 
 with st.expander("Run a portfolio backtest"):
-    pf_assets = st.multiselect(
-        "Choose assets to include:", list(ASSET_OPTIONS.keys()),
-        default=["Bitcoin (BTC)", "Ethereum (ETH)"]
-    )
+    pf_class_label = st.radio("Asset class:", list(ASSET_CLASS_OPTIONS.keys()),
+                              horizontal=True, key="pf_class")
+    pf_class = ASSET_CLASS_OPTIONS[pf_class_label]
+    pf_options = ASSET_OPTIONS if pf_class == "crypto" else INDIAN_STOCK_OPTIONS
+    pf_fetch_func = fetch_data if pf_class == "crypto" else fetch_stock_data
+    pf_currency = "$" if pf_class == "crypto" else "Rs. "
+
+    pf_default = list(pf_options.keys())[:2]
+    pf_assets = st.multiselect("Choose assets to include:", list(pf_options.keys()),
+                               default=pf_default, key="pf_assets")
     pcol1, pcol2, pcol3 = st.columns(3)
     pf_strategy_choice = pcol1.selectbox("Strategy:", list(STRATEGY_FUNCS.keys()), key="pf_strategy")
     pf_risk_choice = pcol2.selectbox("Risk style:", list(RISK_STYLES.keys()), index=2, key="pf_risk")
-    pf_capital = pcol3.number_input("Total capital ($):", min_value=100.0, value=1000.0,
+    pf_capital = pcol3.number_input("Total capital:", min_value=100.0, value=1000.0,
                                     step=100.0, key="pf_capital")
 
     if st.button("Run portfolio backtest", type="primary"):
         if len(pf_assets) == 0:
             st.warning("Select at least one asset.")
         else:
-            pf_symbols = [ASSET_OPTIONS[a] for a in pf_assets]
+            pf_symbols = [pf_options[a] for a in pf_assets]
             pf_func = STRATEGY_FUNCS[pf_strategy_choice]
             pf_risk_kwargs = dict(RISK_STYLES[pf_risk_choice])
 
             with st.spinner("Running portfolio backtest..."):
-                pf_results = run_portfolio_backtest(pf_symbols, pf_func, pf_risk_kwargs, pf_capital)
+                pf_results = run_portfolio_backtest(pf_symbols, pf_func, pf_risk_kwargs,
+                                                     pf_capital, fetch_func=pf_fetch_func)
 
             st.dataframe(pd.DataFrame(pf_results["rows"]), use_container_width=True, hide_index=True)
 
             rcol1, rcol2 = st.columns(2)
-            rcol1.metric("Portfolio final value", f"${pf_results['total_final']:.2f}",
+            rcol1.metric("Portfolio final value", f"{pf_currency}{pf_results['total_final']:.2f}",
                         f"{pf_results['portfolio_return_pct']:.2f}%")
-            rcol2.metric("Blended buy & hold value", f"${pf_results['total_buyhold']:.2f}",
+            rcol2.metric("Blended buy & hold value", f"{pf_currency}{pf_results['total_buyhold']:.2f}",
                         f"{pf_results['buyhold_return_pct']:.2f}%")
 
             if pf_results["portfolio_return_pct"] > pf_results["buyhold_return_pct"]:
@@ -138,27 +150,28 @@ with st.expander("Run a portfolio backtest"):
                 st.warning("Portfolio underperformed the blended buy-and-hold benchmark.")
 
 
-# ---------------------------------------------------------------------
-# AUTO-OPTIMIZER (crypto only for now)
-# ---------------------------------------------------------------------
-
 st.markdown("---")
-st.markdown("### Auto-optimizer (crypto)")
+st.markdown("### Auto-optimizer")
 st.caption("Tests every strategy x risk style combo on one asset and ranks them.")
 st.warning("Important: the top-ranked combo is whichever one happened to fit THIS specific "
-           "historical window best -- that can easily be overfitting rather than a real edge "
-           "(see README for a real example of this happening in this project). Re-check any "
-           "promising combo with a train/test split before trusting it.")
+           "historical window best -- that can easily be overfitting rather than a real edge. "
+           "Re-check any promising combo with a train/test split before trusting it.")
 
 with st.expander("Run auto-optimizer"):
-    opt_asset = st.selectbox("Asset to optimize:", list(ASSET_OPTIONS.keys()), key="opt_asset")
+    opt_class_label = st.radio("Asset class:", list(ASSET_CLASS_OPTIONS.keys()),
+                               horizontal=True, key="opt_class")
+    opt_class = ASSET_CLASS_OPTIONS[opt_class_label]
+    opt_options = ASSET_OPTIONS if opt_class == "crypto" else INDIAN_STOCK_OPTIONS
+    opt_fetch_func = fetch_data if opt_class == "crypto" else fetch_stock_data
+
+    opt_asset = st.selectbox("Asset to optimize:", list(opt_options.keys()), key="opt_asset")
     opt_days = st.slider("Days of history to test on:", min_value=60, max_value=1000,
                          value=200, step=10, key="opt_days")
 
     if st.button("Run auto-optimizer", type="primary"):
-        opt_symbol = ASSET_OPTIONS[opt_asset]
+        opt_symbol = opt_options[opt_asset]
         with st.spinner("Testing strategy/risk combos..."):
-            opt_results = run_optimizer(opt_symbol, opt_days)
+            opt_results = run_optimizer(opt_symbol, opt_days, fetch_func=opt_fetch_func)
 
         st.dataframe(opt_results, use_container_width=True, hide_index=True)
 
@@ -167,10 +180,6 @@ with st.expander("Run auto-optimizer"):
                 f"**{best_row['Risk Style']}** ({best_row['Return %']}% return). "
                 f"Go validate this combo properly before trusting it.")
 
-
-# ---------------------------------------------------------------------
-# ASSET DETAIL (crypto OR Indian stocks)
-# ---------------------------------------------------------------------
 
 st.markdown("---")
 st.markdown("### Asset detail")
@@ -184,7 +193,8 @@ if asset_class == "crypto":
                                list(current_asset_options.keys()) + ["Custom (type any symbol)"])
 else:
     current_asset_options = INDIAN_STOCK_OPTIONS
-    asset_label = st.selectbox("Choose a stock:", list(current_asset_options.keys()))
+    asset_label = st.selectbox("Choose a stock:",
+                               list(current_asset_options.keys()) + ["Custom (type any NSE ticker)"])
     st.caption("Data from Yahoo Finance. 'By number of trades' mode isn't available for "
                "stocks yet -- use 'By number of days'.")
 
@@ -211,6 +221,29 @@ if asset_class == "crypto" and asset_label == "Custom (type any symbol)":
     except Exception as e:
         st.error(f"Couldn't find '{symbol}' on Binance. Check the spelling. (Error: {e})")
         st.stop()
+
+elif asset_class == "stocks" and asset_label == "Custom (type any NSE ticker)":
+    custom_stock_input = st.text_input(
+        "Enter an NSE ticker symbol:",
+        placeholder="e.g. TCS, INFY, RELIANCE, TATASTEEL...",
+        help="Just the ticker is fine -- .NS will be added automatically if you leave it off."
+    )
+    if not custom_stock_input:
+        st.info("Type a ticker above to continue (e.g. TCS, INFY, RELIANCE).")
+        st.stop()
+
+    symbol = resolve_custom_stock_symbol(custom_stock_input)
+    asset_label = symbol
+
+    try:
+        _test_df = fetch_stock_data(symbol, limit=5)
+        if len(_test_df) == 0:
+            st.error(f"'{symbol}' returned no data. Check the ticker is correct.")
+            st.stop()
+    except Exception as e:
+        st.error(f"Couldn't find '{symbol}' on Yahoo Finance. Check the spelling. (Error: {e})")
+        st.stop()
+
 elif asset_class == "crypto":
     symbol = ASSET_OPTIONS[asset_label]
 else:
@@ -244,7 +277,7 @@ if asset_class == "crypto":
     mode = st.radio("Backtest window:", ["By number of days", "By number of trades"],
                     horizontal=True, key=f"mode_{symbol}")
 else:
-    mode = "By number of days"  # trade-count search not yet supported for stocks
+    mode = "By number of days"
 
 if mode == "By number of days":
     lookback_days = st.slider("Number of days to analyze/backtest:", min_value=60, max_value=1000,
@@ -277,18 +310,24 @@ else:
         st.caption(f"Found {achieved_trades} trades within {days_used} days of history.")
     window_label = f"{achieved_trades} trades ({days_used} days of history)"
 
+currency_symbol = "Rs. " if asset_class == "stocks" else "$"
+
 st.markdown(f"## {badge(recommendation, recommendation)}", unsafe_allow_html=True)
 st.write(reason)
 st.caption(f"Using: **{strategy_choice}** with **{risk_choice}** on **{asset_class_label}**")
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Price", f"{'₹' if asset_class == 'stocks' else '$'}{latest['close']:.2f}")
-col2.metric("MA20", f"{'₹' if asset_class == 'stocks' else '$'}{latest['MA_20']:.2f}")
-col3.metric("MA50", f"{'₹' if asset_class == 'stocks' else '$'}{latest['MA_50']:.2f}")
+col1.metric("Price", f"{currency_symbol}{latest['close']:.2f}")
+col2.metric("MA20", f"{currency_symbol}{latest['MA_20']:.2f}")
+col3.metric("MA50", f"{currency_symbol}{latest['MA_50']:.2f}")
 
 st.markdown(f"**Regime:** {badge(latest['regime'], latest['regime'])}  |  **RSI:** {latest['RSI']:.1f}",
             unsafe_allow_html=True)
 st.caption(f"Based on most recent closed candle: {latest['timestamp'].date()}")
+
+if asset_class == "stocks":
+    st.info("Reminder: this strategy's crash-protection and other findings were validated "
+            "on crypto only. Treat this recommendation as unvalidated for stocks.")
 
 if recommendation == "HOLD" and latest["regime"] == "CHOPPY":
     st.caption("Context: markets are choppy about 80% of the time historically.")
@@ -342,10 +381,10 @@ if len(trade_log_df) > 0:
                         file_name=f"{symbol}_{strategy_choice.replace(' ', '_')}_trade_log.csv",
                         mime="text/csv")
 
-pdf_currency = "Rs. " if asset_class == "stocks" else "$"
 pdf_bytes = generate_pdf_report(asset_label, symbol, strategy_choice, risk_choice, slippage_choice,
                                 recommendation, reason, latest, track_results, window_label,
-                                currency=pdf_currency)st.download_button("Download summary report (PDF)", data=pdf_bytes,
+                                currency=currency_symbol)
+st.download_button("Download summary report (PDF)", data=pdf_bytes,
                     file_name=f"{symbol}_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                     mime="application/pdf")
 
