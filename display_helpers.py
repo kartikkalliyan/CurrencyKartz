@@ -427,4 +427,129 @@ def make_comparative_equity_chart(comp_df: pd.DataFrame, title="Multi-Strategy C
     return fig
 
 
+def make_ga_fitness_chart(history_df: pd.DataFrame, title="Genetic Algorithm Strategy Fitness Evolution"):
+    """Renders generation-by-generation GA fitness progression."""
+    if history_df is None or len(history_df) == 0:
+        return go.Figure()
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=history_df["generation"], y=history_df["best_fitness"],
+        mode="lines+markers", name="Best Fitness (Sharpe)",
+        line=dict(color="#00e676", width=2.5)
+    ))
+    fig.add_trace(go.Scatter(
+        x=history_df["generation"], y=history_df["avg_fitness"],
+        mode="lines", name="Population Average",
+        line=dict(color="#38bdf8", width=1.5, dash="dot")
+    ))
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(15, 23, 42, 0.6)",
+        title=title,
+        height=380,
+        margin=dict(l=10, r=10, t=40, b=10),
+        xaxis_title="Generation",
+        yaxis_title="Fitness Score",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        hovermode="x unified"
+    )
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="#1e293b")
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="#1e293b")
+    return fig
+
+
+def make_efficient_frontier_chart(mc_df: pd.DataFrame, max_sharpe: dict, min_vol: dict, title="Markowitz Efficient Frontier"):
+    """Renders Markowitz Efficient Frontier scatter with Tangency and Min-Vol portfolios."""
+    if mc_df is None or len(mc_df) == 0:
+        return go.Figure()
+
+    fig = go.Figure()
+
+    # Scatter Cloud of Monte Carlo simulated portfolios
+    fig.add_trace(go.Scatter(
+        x=mc_df["Volatility %"],
+        y=mc_df["Return %"],
+        mode="markers",
+        marker=dict(
+            size=5,
+            color=mc_df["Sharpe Ratio"],
+            colorscale="Viridis",
+            showscale=True,
+            colorbar=dict(title="Sharpe Ratio")
+        ),
+        name="Simulated Portfolios",
+        text=[f"Sharpe: {s:.2f}" for s in mc_df["Sharpe Ratio"]],
+        hoverinfo="x+y+text"
+    ))
+
+    # Max Sharpe Ratio (Tangency)
+    fig.add_trace(go.Scatter(
+        x=[max_sharpe["volatility_pct"]],
+        y=[max_sharpe["return_pct"]],
+        mode="markers+text",
+        name="Max Sharpe Portfolio ⭐",
+        text=["Max Sharpe ⭐"],
+        textposition="top center",
+        marker=dict(color="#fbbf24", size=15, symbol="star", line=dict(color="#ffffff", width=1))
+    ))
+
+    # Minimum Volatility
+    fig.add_trace(go.Scatter(
+        x=[min_vol["volatility_pct"]],
+        y=[min_vol["return_pct"]],
+        mode="markers+text",
+        name="Min Volatility Portfolio 🛡️",
+        text=["Min Vol 🛡️"],
+        textposition="bottom center",
+        marker=dict(color="#00e676", size=14, symbol="diamond", line=dict(color="#ffffff", width=1))
+    ))
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(15, 23, 42, 0.6)",
+        title=title,
+        height=450,
+        margin=dict(l=10, r=10, t=40, b=10),
+        xaxis_title="Annualized Volatility (Risk %)",
+        yaxis_title="Annualized Expected Return (%)",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
+    )
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="#1e293b")
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="#1e293b")
+    return fig
+
+
+def make_feature_importance_chart(fi_df: pd.DataFrame, title="ML Technical Indicator Feature Importance"):
+    """Renders horizontal bar chart of technical indicator feature importances."""
+    if fi_df is None or len(fi_df) == 0:
+        return go.Figure()
+
+    df_sorted = fi_df.sort_values("Importance %", ascending=True)
+    fig = go.Figure(go.Bar(
+        x=df_sorted["Importance %"],
+        y=df_sorted["Feature"],
+        orientation="h",
+        marker=dict(color="#38bdf8", line=dict(color="#0284c7", width=1))
+    ))
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(15, 23, 42, 0.6)",
+        title=title,
+        height=350,
+        margin=dict(l=10, r=10, t=40, b=10),
+        xaxis_title="Importance Contribution (%)",
+        yaxis_title="Indicator Feature"
+    )
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="#1e293b")
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="#1e293b")
+    return fig
+
+
+
 

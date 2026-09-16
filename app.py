@@ -32,6 +32,8 @@ from reports import generate_pdf_report
 from display_helpers import (make_candlestick_chart, make_equity_drawdown_chart,
                              make_monte_carlo_chart, make_correlation_heatmap,
                              make_comparative_equity_chart,
+                             make_ga_fitness_chart, make_efficient_frontier_chart,
+                             make_feature_importance_chart,
                              badge, inject_custom_css)
 from metrics import full_report
 from alerts import send_telegram_alert, send_discord_alert, format_signal_alert
@@ -43,6 +45,9 @@ from fear_greed import fetch_fear_and_greed_index
 from monte_carlo import run_monte_carlo_simulation
 from walk_forward import run_walk_forward_analysis
 from hft_tester import HFTTesterBot
+from genetic_optimizer import GeneticStrategyOptimizer
+from portfolio_optimizer import MarkowitzOptimizer
+from ml_model import MarketMLPredictor
 
 # Page Configuration
 st.set_page_config(page_title="CurrencyKartz — Quantitative Trading Terminal", layout="wide", page_icon="⚡")
@@ -455,6 +460,66 @@ with tab_deepdive:
                 else:
                     st.info("No backtest data returned. Try selecting different strategies.")
 
+    # Next-Level Feature 1: Genetic Algorithm Strategy Auto-Tuner
+    with st.expander("🧬 Run Genetic Algorithm (GA) Strategy Auto-Tuner"):
+        st.markdown("#### Discover Optimal Strategy Parameters via Evolutionary Natural Selection")
+        st.caption("Evolves fast/slow MA periods, stop-loss %, and trailing stops over generations to maximize the Sharpe Ratio.")
+
+        ga_c1, ga_c2, ga_c3 = st.columns(3)
+        with ga_c1:
+            ga_pop = st.slider("Population Size (Chromosomes):", min_value=12, max_value=36, value=20, step=4, key="ga_pop")
+        with ga_c2:
+            ga_gens = st.slider("Evolution Generations:", min_value=5, max_value=20, value=10, step=1, key="ga_gens")
+        with ga_c3:
+            ga_mut = st.slider("Mutation Rate (%):", min_value=10, max_value=40, value=20, step=5, key="ga_mut") / 100.0
+
+        if st.button("🧬 Start Genetic Evolution", type="primary", key="btn_ga"):
+            with st.spinner(f"Evolving {ga_pop} strategies across {ga_gens} generations..."):
+                ga_opt = GeneticStrategyOptimizer(
+                    df, population_size=ga_pop, generations=ga_gens, mutation_rate=ga_mut
+                )
+                ga_res = ga_opt.optimize()
+
+            best_p = ga_res["best_params"]
+            best_m = ga_res["best_metrics"]
+
+            g1, g2, g3, g4 = st.columns(4)
+            g1.metric("Optimized Return", f"{best_m.get('return_pct', 0.0):+.2f}%")
+            g2.metric("Discovered Sharpe Ratio", f"{best_m.get('sharpe_ratio', 0.0):.2f}")
+            g3.metric("Max Drawdown", f"{best_m.get('max_drawdown_pct', 0.0):.2f}%")
+            g4.metric("Trades Executed", f"{best_m.get('trades', 0)}")
+
+            st.success(f"🏆 Best Evolved Parameters: Fast MA = **{best_p['fast_ma']}**, Slow MA = **{best_p['slow_ma']}**, Stop-Loss = **{best_p['stop_loss_pct']*100:.1f}%**, Trailing Stop = **{best_p['trailing_stop_pct']*100:.1f}%**")
+
+            st.plotly_chart(
+                make_ga_fitness_chart(ga_res["history_df"], title=f"{asset_label} — Genetic Algorithm Fitness Evolution"),
+                use_container_width=True
+            )
+
+    # Next-Level Feature 2: Machine Learning Direction & Feature Importance
+    with st.expander("🤖 Run Machine Learning Direction & Regime Predictor"):
+        st.markdown("#### Random Forest Next-Candle Directional Forecast")
+        st.caption("Trains a Random Forest classifier on technical features using a strict temporal split (no future lookahead bias).")
+
+        if st.button("🔮 Train ML Model & Forecast Next Candle", type="primary", key="btn_ml"):
+            with st.spinner(f"Training Random Forest on {asset_label} indicator features..."):
+                ml_pred = MarketMLPredictor(df)
+                ml_res = ml_pred.train_and_predict()
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Forecast Direction", ml_res["next_direction"])
+            m2.metric("Bullish Probability", f"{ml_res['bullish_prob_pct']:.1f}%")
+            m3.metric("Out-of-Sample Test Accuracy", f"{ml_res['test_accuracy_pct']:.1f}%")
+
+            if not ml_res["feature_importance_df"].empty:
+                st.plotly_chart(
+                    make_feature_importance_chart(
+                        ml_res["feature_importance_df"],
+                        title=f"{asset_label} — Technical Indicator Predictive Importance"
+                    ),
+                    use_container_width=True
+                )
+
     # Export options
     exp1, exp2 = st.columns(2)
     trade_log_df = pd.DataFrame(track_results["trade_log"])
@@ -804,6 +869,65 @@ with tab_portfolio:
             st.plotly_chart(make_correlation_heatmap(corr_df, title="Price Return Correlation Matrix"), use_container_width=True)
     else:
         st.info("Select at least 2 assets to render the correlation matrix.")
+
+    st.markdown("---")
+    # Next-Level Feature 3: Markowitz Modern Portfolio Theory & Efficient Frontier
+    st.markdown("### 📈 Markowitz Modern Portfolio Theory & Efficient Frontier")
+    st.caption("Calculate optimal capital allocations (Max Sharpe & Minimum Volatility) using quadratic optimization (SciPy SLSQP) across 2,000 simulated portfolios.")
+
+    mpt_class_label = st.radio("Asset Universe for MPT:", list(ASSET_CLASS_OPTIONS.keys()), horizontal=True, key="mpt_class_radio")
+    mpt_class = ASSET_CLASS_OPTIONS[mpt_class_label]
+    mpt_opts = ASSET_OPTIONS if mpt_class == "crypto" else INDIAN_STOCK_OPTIONS
+    mpt_fetch = fetch_data if mpt_class == "crypto" else fetch_stock_data
+
+    mpt_selected = st.multiselect("Select assets for portfolio optimization (2 to 6):", list(mpt_opts.keys()), default=list(mpt_opts.keys())[:4], key="mpt_assets_select")
+
+    if st.button("🎯 Calculate Markowitz Efficient Frontier", type="primary", key="btn_mpt"):
+        if len(mpt_selected) < 2:
+            st.warning("Please select at least 2 assets to optimize.")
+        else:
+            with st.spinner("Fetching historical prices and solving quadratic optimization..."):
+                price_series = {}
+                for a in mpt_selected:
+                    sym = mpt_opts[a]
+                    try:
+                        df_a = mpt_fetch(sym, limit=180)
+                        if len(df_a) > 20:
+                            price_series[a] = df_a["close"].values
+                    except Exception:
+                        pass
+
+                if price_series and len(price_series) >= 2:
+                    min_len = min(len(v) for v in price_series.values())
+                    aligned_prices = pd.DataFrame({k: v[-min_len:] for k, v in price_series.items()})
+
+                    mpt = MarkowitzOptimizer(aligned_prices, trading_days=365 if mpt_class == "crypto" else 252)
+                    max_s = mpt.optimize_max_sharpe()
+                    min_v = mpt.optimize_min_volatility()
+                    mc_df = mpt.generate_monte_carlo_frontier(num_portfolios=2000)
+
+                    # Display metrics
+                    col_s1, col_s2 = st.columns(2)
+                    with col_s1:
+                        st.markdown("#### ⭐ Tangency Portfolio (Max Sharpe)")
+                        st.metric("Expected Annual Return", f"{max_s['return_pct']:.2f}%", f"Sharpe: {max_s['sharpe_ratio']:.2f}")
+                        st.metric("Annualized Volatility (Risk)", f"{max_s['volatility_pct']:.2f}%")
+                        st.write("**Optimal Capital Allocation Weights:**")
+                        st.dataframe(pd.DataFrame(list(max_s["weights"].items()), columns=["Asset", "Weight %"]), use_container_width=True, hide_index=True)
+
+                    with col_s2:
+                        st.markdown("#### 🛡️ Minimum Volatility Portfolio")
+                        st.metric("Expected Annual Return", f"{min_v['return_pct']:.2f}%", f"Sharpe: {min_v['sharpe_ratio']:.2f}")
+                        st.metric("Annualized Volatility (Risk)", f"{min_v['volatility_pct']:.2f}%")
+                        st.write("**Lowest Drawdown Allocation Weights:**")
+                        st.dataframe(pd.DataFrame(list(min_v["weights"].items()), columns=["Asset", "Weight %"]), use_container_width=True, hide_index=True)
+
+                    st.plotly_chart(
+                        make_efficient_frontier_chart(mc_df, max_s, min_v, title=f"Markowitz Efficient Frontier — {mpt_class_label}"),
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("Insufficient historical price data retrieved. Please select different assets.")
 
     st.markdown("---")
     st.markdown("### Automated Strategy Optimizer")

@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Pytest-78%20Passing-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Tests](https://img.shields.io/badge/Pytest-90%20Passing-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Free%20Endpoints-success.svg)]()
 
@@ -22,7 +22,10 @@
 Unlike standard hobbyist bots, CurrencyKartz emphasizes mathematical rigor:
 - **Zero-Cost Architecture**: Built entirely on free, open public APIs (no Binance API key or subscription required).
 - **Dual-Asset Pipelines**: Real-time Binance REST & WebSocket streams + Indian NSE stock data.
-- **Institutional Risk Models**: 1,000-path Monte Carlo stress-testing, 95%/99% Value at Risk (VaR), and Walk-Forward rolling train/test validation to prevent curve-fitting.
+- **Genetic Algorithm (GA) Auto-Tuner**: Discovers optimal strategy parameters using natural selection across generations.
+- **Markowitz Modern Portfolio Theory (MPT)**: Computes the Tangency (Max Sharpe) and Minimum Volatility portfolios across 2,000 Monte Carlo frontier simulations.
+- **Machine Learning Direction Predictor**: Random Forest classifier predicting next-candle direction with feature importance ranking.
+- **Institutional Risk Models**: 1,000-path Monte Carlo stress-testing, 95%/99% Value at Risk (VaR), and Walk-Forward rolling validation.
 - **HFT Micro-Structure Virtual Tester**: Zero-risk high-frequency tester simulating Level-2 Order Book Imbalance (OBI) scalping with realistic taker fees.
 - **Paper Trading Engine**: Virtual cash wallet simulation with real-time PnL, open position tracking, and CSV persistence.
 - **Automated Alerts**: Direct push notifications to Telegram Bot & Discord Webhooks.
@@ -48,11 +51,13 @@ flowchart TD
         Backtest[Vectorized Backtest Engine\nSlippage, Fees, Fixed/Trailing Stops, Pos Sizing]
     end
 
-    subgraph AdvancedAnalytics [Stress-Testing & Risk Math]
+    subgraph AdvancedAnalytics [Quant Engines & Optimizers]
+        GA[Genetic Algorithm Auto-Tuner\nEvolves Parameters to Maximize Sharpe]
+        MPT[Markowitz MPT & Efficient Frontier\nTangency & Min-Vol Quadratic Optimization]
+        ML[Random Forest ML Predictor\nNext-Candle Forecast & Feature Importance]
         MC[Monte Carlo Simulator\n1,000 Bootstrap Paths, 95/99% VaR, Ruin Prob]
         WF[Walk-Forward Optimizer\nRolling In-Sample vs Out-of-Sample Efficiency]
         Heatmap[Cross-Asset Correlation Heatmap]
-        Comp[Multi-Strategy Comparative Analyzer]
     end
 
     subgraph ExecutionUI [Terminal & Execution Layer]
@@ -67,14 +72,18 @@ flowchart TD
     Ind --> Regime
     Regime --> Strat
     Strat --> Backtest
+    Backtest --> GA
+    Backtest --> MPT
+    Ind --> ML
     Backtest --> MC
     Backtest --> WF
-    Backtest --> Comp
     Cache --> Heatmap
     Backtest --> UI
+    GA --> UI
+    MPT --> UI
+    ML --> UI
     MC --> UI
     WF --> UI
-    Comp --> UI
     Heatmap --> UI
     Strat --> Paper
     Strat --> Alerts
