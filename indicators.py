@@ -79,6 +79,74 @@ def add_breakout_levels(df, window=20):
     return df
 
 
+def add_vwap(df):
+    """
+    VWAP (Volume-Weighted Average Price):
+    Calculates cumulative (Typical Price * Volume) / cumulative Volume.
+    Typical Price = (High + Low + Close) / 3
+    """
+    typical_price = (df["high"] + df["low"] + df["close"]) / 3
+    tpv = typical_price * df["volume"]
+    cum_tpv = tpv.cumsum()
+    cum_vol = df["volume"].cumsum()
+    df["VWAP"] = cum_tpv / cum_vol
+    return df
+
+
+def add_supertrend(df, period=10, multiplier=3):
+    """
+    Supertrend Indicator:
+    Calculates upper and lower trailing bands using ATR to determine trend direction.
+    - Supertrend line follows trailing stop level.
+    - Supertrend_dir = 1 (Bullish) or -1 (Bearish).
+    """
+    if "ATR" not in df.columns:
+        df = add_atr(df, period=period)
+
+    hl2 = (df["high"] + df["low"]) / 2
+    basic_upper = hl2 + (multiplier * df["ATR"])
+    basic_lower = hl2 - (multiplier * df["ATR"])
+
+    n = len(df)
+    upper_band = [0.0] * n
+    lower_band = [0.0] * n
+    trend = [1] * n
+    supertrend = [0.0] * n
+
+    for i in range(1, n):
+        # Upper band logic
+        if basic_upper.iloc[i] < upper_band[i-1] or df["close"].iloc[i-1] > upper_band[i-1]:
+            upper_band[i] = basic_upper.iloc[i]
+        else:
+            upper_band[i] = upper_band[i-1]
+
+        # Lower band logic
+        if basic_lower.iloc[i] > lower_band[i-1] or df["close"].iloc[i-1] < lower_band[i-1]:
+            lower_band[i] = basic_lower.iloc[i]
+        else:
+            lower_band[i] = lower_band[i-1]
+
+        # Trend direction assignment
+        if trend[i-1] == 1:
+            if df["close"].iloc[i] < lower_band[i]:
+                trend[i] = -1
+                supertrend[i] = upper_band[i]
+            else:
+                trend[i] = 1
+                supertrend[i] = lower_band[i]
+        else:
+            if df["close"].iloc[i] > upper_band[i]:
+                trend[i] = 1
+                supertrend[i] = lower_band[i]
+            else:
+                trend[i] = -1
+                supertrend[i] = upper_band[i]
+
+    df["Supertrend"] = supertrend
+    df["Supertrend_dir"] = trend
+    return df
+
+
 def add_all_indicators(df):
     df = add_moving_averages(df)
     df = add_rsi(df)
@@ -86,6 +154,8 @@ def add_all_indicators(df):
     df = add_atr(df)
     df = add_bollinger_bands(df)
     df = add_breakout_levels(df)
+    df = add_vwap(df)
+    df = add_supertrend(df)
     return df
 if __name__ == "__main__":
     df = pd.read_csv("btc_daily.csv", parse_dates=["timestamp"])

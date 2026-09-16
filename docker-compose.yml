@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  currencykartz:
+    build: .
+    container_name: currencykartz_app
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1

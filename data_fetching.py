@@ -1,12 +1,22 @@
 """
 All Binance API interaction lives here -- fetching recent data, paginated
 history for long lookbacks, and the "search until N trades found" logic.
+
+Also exposes cached wrappers for the free market-data endpoints in
+binance_market.py (ticker snapshot, order book, recent trades).
 """
 
 import requests
 import pandas as pd
 import streamlit as st
 from datetime import datetime
+
+from binance_market import (
+    get_market_summary,
+    get_order_book,
+    get_recent_trades,
+    get_all_usdt_symbols,
+)
 
 
 @st.cache_data(ttl=300)
@@ -93,3 +103,43 @@ def find_data_for_trade_target(symbol, strategy_func, target_trades, prep_data_f
             return signal_df, num_trades, days
 
         days = min(days * 2, max_days)
+
+
+# ---------------------------------------------------------------------------
+# Cached wrappers for free Binance market-data endpoints
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=60)
+def fetch_ticker_snapshot(symbol: str) -> dict:
+    """
+    Returns a market summary (24h stats + bid/ask) for a symbol.
+    Cached for 60 seconds so the UI doesn't spam the endpoint on every rerun.
+    """
+    return get_market_summary(symbol)
+
+
+@st.cache_data(ttl=10)
+def fetch_order_book_snapshot(symbol: str, limit: int = 10) -> dict:
+    """
+    Returns the top `limit` bids and asks for a symbol.
+    Cached for 10 seconds for a near-real-time feel without hammering the API.
+    """
+    return get_order_book(symbol, limit=limit)
+
+
+@st.cache_data(ttl=15)
+def fetch_recent_trades_snapshot(symbol: str, limit: int = 20) -> list:
+    """
+    Returns the most recent `limit` public trades for a symbol.
+    Cached for 15 seconds.
+    """
+    return get_recent_trades(symbol, limit=limit)
+
+
+@st.cache_data(ttl=3600)
+def fetch_all_usdt_symbols() -> list:
+    """
+    Returns all active USDT trading pairs from Binance exchangeInfo.
+    Cached for 1 hour since the list changes rarely.
+    """
+    return get_all_usdt_symbols()

@@ -1,178 +1,216 @@
-# CurrencyKartz
+# ⚡ CurrencyKartz — Quantitative Trading & Algorithmic Research Terminal
 
-An open-source quantitative trading research platform for cryptocurrency markets.
+<div align="center">
 
-CurrencyKartz provides a modular framework for developing, testing, comparing, and optimizing algorithmic trading strategies using historical market data.
----
+[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Tests](https://img.shields.io/badge/Pytest-78%20Passing-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Cost](https://img.shields.io/badge/Cost-100%25%20Free%20Endpoints-success.svg)]()
 
-## Features
+**An institutional-grade, zero-cost quantitative trading research and paper execution platform for Cryptocurrency (Binance) and Indian Equities (NSE).**
 
-✅ Historical Backtesting
-
-✅ Multiple Trading Strategies
-
-- Moving Average Crossover
-- Filtered MA Strategy
-- MACD
-- Bollinger Bands
-- Breakout Strategy
-- Buy & Hold Benchmark
-- Adaptive Strategy
-- Candlestick Pattern Strategy
-
-✅ Technical Indicators
-
-- RSI
-- EMA
-- SMA
-- MACD
-- ATR
-- Bollinger Bands
-
-✅ Risk Management
-
-- Trailing Stop Loss
-- ATR-based exits
-- Drawdown analysis
-
-✅ Market Regime Detection
-
-- Trend detection
-- Adaptive strategy switching
-
-✅ Multi Asset Testing
-
-Run strategies across multiple cryptocurrencies instead of a single BTC dataset.
-
-✅ Live Signal Generation
-
-Generate trading signals from the latest market data.
+</div>
 
 ---
 
-## Project Structure
+## 📌 Overview
 
-```text
-app.py                        # Streamlit interface
+**CurrencyKartz** is a quantitative finance framework and interactive financial terminal designed for researching, stress-testing, and virtual-trading algorithmic strategies.
 
-backtest.py                   # Core backtesting engine
+Unlike standard hobbyist bots, CurrencyKartz emphasizes mathematical rigor:
+- **Zero-Cost Architecture**: Built entirely on free, open public APIs (no Binance API key or subscription required).
+- **Dual-Asset Pipelines**: Real-time Binance REST & WebSocket streams + Indian NSE stock data.
+- **Institutional Risk Models**: 1,000-path Monte Carlo stress-testing, 95%/99% Value at Risk (VaR), and Walk-Forward rolling train/test validation to prevent curve-fitting.
+- **HFT Micro-Structure Virtual Tester**: Zero-risk high-frequency tester simulating Level-2 Order Book Imbalance (OBI) scalping with realistic taker fees.
+- **Paper Trading Engine**: Virtual cash wallet simulation with real-time PnL, open position tracking, and CSV persistence.
+- **Automated Alerts**: Direct push notifications to Telegram Bot & Discord Webhooks.
 
-live_bot.py                   # Live signal generator
+---
 
-fetch_data.py                 # Historical data collection
+## 🏛️ System Architecture
 
-indicators.py                 # Technical indicators
+```mermaid
+flowchart TD
+    subgraph MarketData [Free Public Market Data Feeds]
+        B_REST[Binance Public REST API\n/ticker/24hr, /depth, /trades]
+        B_WS[Binance Live WebSocket\n@kline, @ticker, @depth5]
+        NSE[Yahoo Finance API\nIndian Equities / NSE Top 50]
+        FNG[Alternative.me\nCrypto Fear & Greed Index API]
+    end
 
-regime_detector.py            # Market regime detection
+    subgraph CoreEngine [Quantitative Core Engine]
+        Cache[Data Fetching & Memory Caching]
+        Ind[Technical Indicator Suite\nVWAP, Supertrend, ATR, RSI, MACD, BB]
+        Regime[Market Regime Classifier\nTrending Bull/Bear vs Choppy Sideways]
+        Strat[Strategy Signal Matrix\n10 Technical & Ensemble Models]
+        Backtest[Vectorized Backtest Engine\nSlippage, Fees, Fixed/Trailing Stops, Pos Sizing]
+    end
 
-strategy_*.py                 # Trading strategies
+    subgraph AdvancedAnalytics [Stress-Testing & Risk Math]
+        MC[Monte Carlo Simulator\n1,000 Bootstrap Paths, 95/99% VaR, Ruin Prob]
+        WF[Walk-Forward Optimizer\nRolling In-Sample vs Out-of-Sample Efficiency]
+        Heatmap[Cross-Asset Correlation Heatmap]
+        Comp[Multi-Strategy Comparative Analyzer]
+    end
 
-multi_asset_*.py              # Multi-asset testing
+    subgraph ExecutionUI [Terminal & Execution Layer]
+        UI[Streamlit Dark Financial Terminal\nTradingView Candlesticks & Dual Panels]
+        Paper[Virtual Paper Trading Simulator\nPersistent Orders & PnL CSV]
+        Alerts[Notification Dispatcher\nTelegram Bot & Discord Webhooks]
+        Reports[Automated PDF Quant Tear-Sheet]
+    end
 
-run_train_test*.py            # Train/Test workflows
-
-btc_*.csv                     # Historical datasets
-
-trade_journal.csv             # Trade history
-
-backtest_trade_log.csv        # Detailed backtest logs
+    MarketData --> Cache
+    Cache --> Ind
+    Ind --> Regime
+    Regime --> Strat
+    Strat --> Backtest
+    Backtest --> MC
+    Backtest --> WF
+    Backtest --> Comp
+    Cache --> Heatmap
+    Backtest --> UI
+    MC --> UI
+    WF --> UI
+    Comp --> UI
+    Heatmap --> UI
+    Strat --> Paper
+    Strat --> Alerts
+    Backtest --> Reports
 ```
 
 ---
 
-## Tech Stack
+## ✨ Key Platform Features
 
-- Python
-- Pandas
-- NumPy
-- Matplotlib
-- Plotly
-- yfinance
-- Streamlit
+### 1. 📊 Dual Market & Live Data Ingestion
+- **Binance Public REST API**: Real-time 24h ticker metrics, live depth book (bids/asks), order book spread, and recent trade ticks.
+- **Binance WebSockets (`binance_ws.py`)**: Async multi-stream client with automatic reconnection logic for sub-second candle and ticker updates.
+- **Indian Stocks (NSE)**: Full support for top Indian equities (Reliance, TCS, HDFC Bank, Infosys, etc.) via Yahoo Finance.
+- **Alternative.me Sentiment API**: Live Crypto Fear & Greed index classification integrated into trading filters.
+
+### 2. 🧠 Strategy Library (10 Models)
+1. **Regime-Filtered MA Crossover**: Dynamic EMA crossover executing only when ADX/regime confirms a trend.
+2. **Supertrend Trend-Following**: ATR-based adaptive trailing volatility band model.
+3. **VWAP Crossover**: Institutional volume-weighted average price breakout & pullback system.
+4. **Sentiment-Filtered MA**: Combines Fear & Greed sentiment with technical indicators.
+5. **Weighted Custom Ensemble**: Configurable weighted voting across 6 core technical models.
+6. **RSI Mean-Reversion**: Overbought/oversold counter-trend model.
+7. **Bollinger Bands**: Volatility mean-reversion with dynamic bandwidth filters.
+8. **MACD Crossover**: Momentum divergence and signal line crosses.
+9. **Volume-Confirmed Breakout**: 20-day high breakouts validated by volume surges.
+10. **Buy & Hold (Baseline Benchmark)**: Built-in control baseline for alpha calculation.
+
+### 3. 🔬 Institutional Stress-Testing & Overfitting Protection
+- **Monte Carlo Simulator (`monte_carlo.py`)**: Resamples historical trade returns across 1,000 paths to compute **95% & 99% Value at Risk (VaR)** and **Ruin Probability** (>30% drawdown).
+- **Walk-Forward Optimizer (`walk_forward.py`)**: Tests rolling Train (In-Sample) vs Test (Out-of-Sample) windows to detect curve-fitting and calculate strategy **Efficiency Ratios**.
+- **Cross-Asset Correlation Matrix**: Interactive Plotly heatmap assessing portfolio diversification across assets.
+- **Head-to-Head Comparative Backtest**: Side-by-side equity overlay tool comparing up to 3 strategies simultaneously.
+
+### 4. 📝 Paper Trading & Alert Dispatcher
+- **Virtual Paper Wallet (`paper_trading.py`)**: $10,000 initial virtual cash, market BUY/SELL order simulation, live open position tracking, and persistent CSV storage.
+- **Instant Alerts (`alerts.py`)**: Webhook triggers pushing signal alerts directly to Telegram channels and Discord servers.
+- **Quant Tear-Sheet Reports (`reports.py`)**: 1-click downloadable PDF reports summarizing Sharpe, Sortino, Calmar ratios, and equity metrics.
 
 ---
 
-## Installation
+## 🚀 Quickstart Guide
+
+### Option A: Local Run (Python)
 
 ```bash
-git clone https://github.com/kartikkalliyan/-crypto-strategy-backtester.git
+# 1. Clone the repository
+git clone https://github.com/kartikkalliyan/CurrencyKartz.git
+cd CurrencyKartz
 
-cd -crypto-strategy-backtester
+# 2. Create virtual environment & install dependencies
+python -m venv .venv
+# On Windows:
+.venv\Scripts\activate
+# On Linux/macOS:
+source .venv/bin/activate
 
 pip install -r requirements.txt
+
+# 3. Launch the financial terminal
+python -m streamlit run app.py
 ```
 
----
+### Option B: Docker (1-Command Launch)
 
-## Run Backtest
+No local Python setup required!
 
 ```bash
-python backtest.py
+# Launch containerized terminal
+docker compose up -d
+
+# Open in your browser:
+# http://localhost:8501
 ```
+
+To stop the container:
+```bash
+docker compose down
+```
+
+### Option C: Free Streamlit Cloud Deployment (100% Free)
+1. Fork or push this repository to your GitHub account.
+2. Visit [share.streamlit.io](https://share.streamlit.io) and log in with GitHub.
+3. Select your repository, set branch to `main`, and main file to `app.py`.
+4. Click **Deploy** — your live terminal will be live at `https://<your-username>-currencykartz.streamlit.app`!
 
 ---
 
-## Launch Application
+## 🧪 Comprehensive Unit Testing
+
+CurrencyKartz includes a rigorous test suite covering network clients, indicator calculations, backtesting logic, risk management, and Monte Carlo models:
 
 ```bash
-streamlit run app.py
+python -m pytest tests/ -v
+```
+
+All 72 tests run with mocked network dependencies, allowing clean offline execution in CI/CD environments.
+
+---
+
+## 📂 Project Structure
+
+```text
+├── .github/workflows/
+│   └── test.yml                 # Automated GitHub Actions CI/CD pipeline
+├── Dockerfile                   # Production Python 3.11 container image
+├── docker-compose.yml           # Docker service definition
+├── requirements.txt             # Python dependencies
+├── app.py                       # Modern 6-Tab Streamlit Financial Terminal
+├── config.py                    # Asset universe, risk styles & strategy registry
+├── core_logic.py                # Quant decision engine & comparative backtest
+├── backtest.py                  # Vectorized backtesting engine (fees, slippage, stops)
+├── metrics.py                   # Sharpe, Sortino, Calmar, MaxDD, CAGR calculations
+├── indicators.py                # Technical indicator suite (VWAP, Supertrend, ATR, etc.)
+├── regime_detector.py           # Market regime classification (Trend vs Chop)
+├── binance_market.py            # Free Binance public REST API wrapper
+├── binance_ws.py                # Free Binance WebSocket streaming client
+├── fear_greed.py                # Crypto Fear & Greed index parser
+├── monte_carlo.py               # 1,000-path Monte Carlo & VaR engine
+├── walk_forward.py              # Walk-Forward rolling train/test validator
+├── paper_trading.py             # Virtual paper trading account engine
+├── alerts.py                    # Telegram & Discord push notification dispatcher
+├── display_helpers.py           # Plotly TradingView candlesticks, fan charts & CSS
+├── reports.py                   # PDF tear-sheet export generator
+├── strategy_*.py                # 10 modular trading strategy files
+└── tests/                       # Comprehensive Pytest suite (72 unit tests)
 ```
 
 ---
 
-## Strategy Comparison
+## 📄 License
 
-| Strategy | Status |
-|-----------|--------|
-| Buy & Hold | ✅ |
-| MA Crossover | ✅ |
-| Filtered MA | ✅ |
-| MACD | ✅ |
-| Bollinger Bands | ✅ |
-| Breakout | ✅ |
-| Adaptive Strategy | ✅ |
-| Candlestick Strategy | ✅ |
+Distributed under the **MIT License**. See `LICENSE` for more information.
 
 ---
 
-## Repository Highlights
-
-- Modular strategy architecture
-- Reusable indicator library
-- Historical data pipeline
-- Live trading signal generation
-- Multi-asset evaluation
-- Train/Test validation
-- Crash testing framework
-- Trade logging
-- CSV export support
-
----
-
-## Future Improvements
-
-- [ ] Binance API integration
-- [ ] Portfolio optimization
-- [ ] Walk-forward optimization
-- [ ] Genetic Algorithm parameter tuning
-- [ ] Reinforcement Learning strategies
-- [ ] Docker deployment
-- [ ] REST API
-- [ ] Interactive dashboard
-- [ ] Performance analytics dashboard
-
----
-
-## Why this project?
-
-The goal of this project is to build a complete quantitative trading research framework rather than a simple trading bot.
-
-It focuses on experimentation, strategy development, and realistic backtesting while maintaining a modular architecture that can be extended with new strategies and indicators.
-
----
-
-## Author
-
-**Kartik Kalliyan**
-
-If you found this project useful, consider giving it a ⭐.
+<div align="center">
+Developed by <b>Kartik Kalliyan</b> • Built with Python & Streamlit
+</div>

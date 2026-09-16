@@ -8,7 +8,7 @@ from fpdf import FPDF
 
 
 def generate_pdf_report(asset_label, symbol, strategy_choice, risk_choice, slippage_choice,
-                        recommendation, reason, latest, track_results, window_label):
+                        recommendation, reason, latest, track_results, window_label, currency="$"):
     pdf = FPDF()
     pdf.add_page()
 
@@ -32,8 +32,8 @@ def generate_pdf_report(asset_label, symbol, strategy_choice, risk_choice, slipp
     pdf.set_font("Helvetica", "", 10)
     pdf.multi_cell(0, 6, reason)
     pdf.ln(2)
-    pdf.cell(0, 6, f"Price: ${latest['close']:.2f}   MA20: ${latest['MA_20']:.2f}   "
-                   f"MA50: ${latest['MA_50']:.2f}", ln=1)
+    pdf.cell(0, 6, f"Price: {currency}{latest['close']:.2f}   MA20: {currency}{latest['MA_20']:.2f}   "
+                   f"MA50: {currency}{latest['MA_50']:.2f}", ln=1)
     pdf.cell(0, 6, f"Regime: {latest['regime']}   RSI: {latest['RSI']:.1f}", ln=1)
     pdf.cell(0, 6, f"As of candle: {latest['timestamp'].date()}", ln=1)
     pdf.ln(4)

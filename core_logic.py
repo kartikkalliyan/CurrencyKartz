@@ -194,3 +194,40 @@ def run_optimizer(symbol, lookback_days=200, fetch_func=None):
     results_df = pd.DataFrame(results)
     results_df = results_df.sort_values("Return %", ascending=False, na_position="last")
     return results_df
+
+
+def run_comparative_backtest(df: pd.DataFrame, strategy_names: list, risk_kwargs: dict = None) -> dict:
+    """
+    Runs backtests for multiple strategies on the same prepped dataset
+    and returns aligned equity curves for side-by-side plotting.
+    """
+    if risk_kwargs is None:
+        risk_kwargs = {}
+
+    comp_df = pd.DataFrame({"timestamp": df["timestamp"].values})
+    metrics_summary = []
+
+    if len(df) > 0 and "close" in df.columns:
+        first_close = df.iloc[0]["close"]
+        if first_close > 0:
+            comp_df["Buy & Hold Baseline"] = 1000.0 * (1 - 0.001) * (df["close"].values / first_close)
+
+    for name in strategy_names:
+        if name in STRATEGY_FUNCS:
+            s_func = STRATEGY_FUNCS[name]
+            sig_df = s_func(df.copy())
+            res = backtest(sig_df, starting_cash=1000.0, fee_rate=0.001, **risk_kwargs)
+
+            comp_df[name] = res["equity_curve"].values
+
+            metrics_summary.append({
+                "Strategy": name,
+                "Return %": round(res["strategy_return_pct"], 2),
+                "Trades": res["num_trades"],
+                "Final Equity ($)": round(res["final_value_strategy"], 2),
+            })
+
+    return {
+        "equity_df": comp_df,
+        "summary": pd.DataFrame(metrics_summary),
+    }
