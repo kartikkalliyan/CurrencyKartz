@@ -551,5 +551,47 @@ def make_feature_importance_chart(fi_df: pd.DataFrame, title="ML Technical Indic
     return fig
 
 
+def make_twap_execution_chart(fills_df: pd.DataFrame, title="Institutional Order Execution Slices"):
+    """Renders dual-axis bar and line chart of child order size vs. execution price."""
+    if fills_df is None or len(fills_df) == 0:
+        return go.Figure()
+
+    fig = go.Figure()
+
+    # Bar chart for child slice USD size
+    fig.add_trace(go.Bar(
+        x=fills_df["slice"],
+        y=fills_df["child_usd"],
+        name="Child Slice Capital ($)",
+        marker=dict(color="#38bdf8", line=dict(color="#0284c7", width=1)),
+        yaxis="y"
+    ))
+
+    # Line chart for Execution Price
+    fig.add_trace(go.Scatter(
+        x=fills_df["slice"],
+        y=fills_df["exec_price"],
+        name="Exec Price ($)",
+        mode="lines+markers",
+        line=dict(color="#00e676", width=2.5),
+        yaxis="y2"
+    ))
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(15, 23, 42, 0.6)",
+        title=title,
+        height=380,
+        margin=dict(l=10, r=10, t=40, b=10),
+        xaxis_title="Slice Step",
+        yaxis=dict(title="Child Capital ($)", showgrid=True, gridcolor="#1e293b"),
+        yaxis2=dict(title="Execution Price ($)", overlaying="y", side="right", showgrid=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
+    )
+    return fig
+
+
+
 
 

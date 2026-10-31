@@ -33,7 +33,7 @@ from display_helpers import (make_candlestick_chart, make_equity_drawdown_chart,
                              make_monte_carlo_chart, make_correlation_heatmap,
                              make_comparative_equity_chart,
                              make_ga_fitness_chart, make_efficient_frontier_chart,
-                             make_feature_importance_chart,
+                             make_feature_importance_chart, make_twap_execution_chart,
                              badge, inject_custom_css)
 from metrics import full_report
 from alerts import send_telegram_alert, send_discord_alert, format_signal_alert
@@ -48,6 +48,7 @@ from hft_tester import HFTTesterBot
 from genetic_optimizer import GeneticStrategyOptimizer
 from portfolio_optimizer import MarkowitzOptimizer
 from ml_model import MarketMLPredictor
+from execution_slicer import InstitutionalExecutionSlicer
 
 # Page Configuration
 st.set_page_config(page_title="CurrencyKartz — Quantitative Trading Terminal", layout="wide", page_icon="⚡")
@@ -810,6 +811,57 @@ with tab_depth:
                 st.warning("Insufficient tick data received from Binance public feeds. Please retry.")
         except Exception as e:
             st.error(f"HFT simulation error: {e}")
+
+    st.markdown("---")
+    st.markdown("### ⏱️ Institutional Execution Slicer (TWAP & VWAP)")
+    st.caption("Simulate how institutional trading desks slice large parent orders into time-weighted or volume-weighted micro child orders to minimize market impact and implementation shortfall.")
+
+    with st.expander("⚙️ Execution Slicer Strategy Setup", expanded=True):
+        ec1, ec2, ec3 = st.columns(3)
+        with ec1:
+            slice_order_usd = st.number_input("Parent Order Size ($):", value=10000.0, step=1000.0, key="slice_usd")
+            slice_side = st.selectbox("Execution Side:", ["BUY", "SELL"], key="slice_side")
+        with ec2:
+            slice_algo = st.selectbox("Slicing Algorithm:", ["TWAP (Time-Weighted)", "VWAP (Volume-Weighted)"], key="slice_algo")
+            slice_count = st.slider("Child Order Slices (N):", min_value=3, max_value=20, value=8, step=1, key="slice_n")
+        with ec3:
+            slice_coef = st.number_input("Market Impact Factor:", value=0.00005, step=0.00001, format="%.5f", key="slice_coef")
+            slice_fee = st.number_input("Taker Fee Rate (%):", value=0.075, step=0.01, format="%.3f", key="slice_fee") / 100.0
+
+        run_slicer = st.button("🚀 Run Algorithmic Order Slicer", type="primary", key="btn_run_slicer")
+
+    if run_slicer:
+        try:
+            with st.spinner("Fetching kline feeds and slicing parent order..."):
+                kline_df = fetch_data(ob_symbol, limit=slice_count + 5)
+                slicer = InstitutionalExecutionSlicer(
+                    kline_df,
+                    parent_order_usd=slice_order_usd,
+                    num_slices=slice_count,
+                    side=slice_side,
+                    base_fee_rate=slice_fee,
+                    impact_coefficient=slice_coef
+                )
+                if "TWAP" in slice_algo:
+                    exec_res = slicer.simulate_twap()
+                else:
+                    exec_res = slicer.simulate_vwap()
+
+            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+            m_col1.metric("Arrival Price", f"${exec_res['arrival_price']:,.4f}")
+            m_col2.metric("Avg Executed Price", f"${exec_res['avg_exec_price']:,.4f}")
+            m_col3.metric("Implementation Shortfall", f"{exec_res['shortfall_bps']:+.2f} bps")
+            m_col4.metric("Total Exchange Fees", f"${exec_res['total_fees']:.4f}")
+
+            st.plotly_chart(
+                make_twap_execution_chart(exec_res["fills_df"], title=f"{ob_symbol} — {exec_res['algo']} Child Order Execution Schedule"),
+                use_container_width=True
+            )
+
+            st.markdown("#### 📑 Child Order Fill Schedule")
+            st.dataframe(exec_res["fills_df"], use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.error(f"Execution slicing error: {e}")
 
 
 # ============================================================================

@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Pytest-90%20Passing-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Tests](https://img.shields.io/badge/Pytest-94%20Passing-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Free%20Endpoints-success.svg)]()
 
@@ -22,6 +22,7 @@
 Unlike standard hobbyist bots, CurrencyKartz emphasizes mathematical rigor:
 - **Zero-Cost Architecture**: Built entirely on free, open public APIs (no Binance API key or subscription required).
 - **Dual-Asset Pipelines**: Real-time Binance REST & WebSocket streams + Indian NSE stock data.
+- **Institutional Execution Slicer (TWAP & VWAP)**: Simulates algorithmic parent-order slicing into time-weighted and volume-weighted child orders with implementation shortfall (bps) metrics.
 - **Genetic Algorithm (GA) Auto-Tuner**: Discovers optimal strategy parameters using natural selection across generations.
 - **Markowitz Modern Portfolio Theory (MPT)**: Computes the Tangency (Max Sharpe) and Minimum Volatility portfolios across 2,000 Monte Carlo frontier simulations.
 - **Machine Learning Direction Predictor**: Random Forest classifier predicting next-candle direction with feature importance ranking.
