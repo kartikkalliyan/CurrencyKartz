@@ -108,12 +108,27 @@ def add_supertrend(df, period=10, multiplier=3):
     basic_lower = hl2 - (multiplier * df["ATR"])
 
     n = len(df)
-    upper_band = [0.0] * n
-    lower_band = [0.0] * n
+    nan = float("nan")
+    upper_band = [nan] * n
+    lower_band = [nan] * n
     trend = [1] * n
-    supertrend = [0.0] * n
+    supertrend = [nan] * n
 
-    for i in range(1, n):
+    # ATR is empty for the first `period` rows. The bands must be seeded from the
+    # first row where ATR exists; carrying a NaN forward would poison every later
+    # band (NaN comparisons are always False, so the value never recovers) and the
+    # indicator would stay NaN -- and never signal -- for the whole history.
+    first_valid = df["ATR"].first_valid_index()
+    if first_valid is None:
+        df["Supertrend"] = supertrend
+        df["Supertrend_dir"] = trend
+        return df
+    start = df.index.get_loc(first_valid)
+    upper_band[start] = basic_upper.iloc[start]
+    lower_band[start] = basic_lower.iloc[start]
+    supertrend[start] = lower_band[start]   # begins bullish (trend[start] == 1)
+
+    for i in range(start + 1, n):
         # Upper band logic
         if basic_upper.iloc[i] < upper_band[i-1] or df["close"].iloc[i-1] > upper_band[i-1]:
             upper_band[i] = basic_upper.iloc[i]
