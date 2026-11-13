@@ -1,10 +1,17 @@
 """
 ENSEMBLE VOTING strategy.
 
-Runs all 7 existing strategies and only generates a BUY/SELL signal
-when at least `min_votes` of them agree on the same direction. The
-idea: a signal backed by multiple independent methods is more likely
-to reflect something real, rather than one strategy's specific noise.
+Runs 6 of the existing strategies and goes long only when at least `min_votes` of
+them are CURRENTLY long. The idea: a position backed by multiple independent methods
+is more likely to reflect something real, rather than one strategy's specific noise.
+
+Why vote on stance instead of on signals: strategies emit BUY/SELL only on the single
+bar where their condition flips, so requiring several strategies to flip on the very
+same day almost never happens (on 6 years of BTC the old version produced 0 BUYs and
+1 SELL, i.e. it never traded). Each strategy's signals are therefore turned into a
+stance first -- long after its BUY, flat after its SELL, unchanged on HOLD -- and the
+vote is taken on those stances. The ensemble emits BUY when the long-vote count
+reaches `min_votes` and SELL when it drops back below it.
 
 This is a genuine hypothesis worth testing, not an assumed improvement --
 we validate it with the same rigor as everything else (train/test,
@@ -30,27 +37,33 @@ VOTING_STRATEGIES = [
 MIN_VOTES = 3  # out of 6 -- majority agreement required
 
 
+def _stance(signal: pd.Series) -> pd.Series:
+    """1 while a strategy is long (since its last BUY), 0 after its SELL, 0 before any signal."""
+    state = signal.map({"BUY": 1.0, "SELL": 0.0})   # HOLD -> NaN
+    return state.ffill().fillna(0.0)
+
+
 def generate_signals(df, min_votes=MIN_VOTES):
     df = df.copy()
 
-    all_signals = []
+    stances = []
     for strat_func in VOTING_STRATEGIES:
         try:
             sdf = strat_func(df.copy())
-            all_signals.append(sdf["signal"])
+            stances.append(_stance(sdf["signal"]))
         except Exception:
-            # If a strategy fails on this data, just skip its vote
-            all_signals.append(pd.Series(["HOLD"] * len(df), index=df.index))
+            # If a strategy fails on this data, it simply votes "not long"
+            stances.append(pd.Series(0.0, index=df.index))
 
-    votes_df = pd.concat(all_signals, axis=1)
-    buy_votes = (votes_df == "BUY").sum(axis=1)
-    sell_votes = (votes_df == "SELL").sum(axis=1)
+    long_votes = pd.concat(stances, axis=1).sum(axis=1).astype(int)
+    want_long = long_votes >= min_votes
+    was_long = want_long.shift(1, fill_value=False)
 
     df["signal"] = "HOLD"
-    df.loc[buy_votes >= min_votes, "signal"] = "BUY"
-    df.loc[sell_votes >= min_votes, "signal"] = "SELL"
-    df["buy_votes"] = buy_votes
-    df["sell_votes"] = sell_votes
+    df.loc[want_long & ~was_long, "signal"] = "BUY"
+    df.loc[~want_long & was_long, "signal"] = "SELL"
+    df["buy_votes"] = long_votes
+    df["sell_votes"] = len(VOTING_STRATEGIES) - long_votes
 
     return df
 
